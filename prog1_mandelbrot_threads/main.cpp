@@ -66,12 +66,43 @@ bool verifyResult (int *gold, int *result, int width, int height) {
     return 1;
 }
 
+/*
+    简单按行分割：
+    numThreads = 1:     [592.929] ms
+    numThreads = 2:     [299.835] ms    (1.99x speedup from 2 threads)
+    numThreads = 3:     [359.113] ms    (1.65x speedup from 3 threads)
+    numThreads = 4:     [240.334] ms    (2.44x speedup from 4 threads)
+    numThreads = 5:     [235.651] ms    (2.51x speedup from 5 threads)
+    numThreads = 6:     [179.616] ms    (3.32x speedup from 6 threads)
+    numThreads = 7:     [170.607] ms    (3.44x speedup from 7 threads)
+    numThreads = 8:     [144.491] ms    (4.05x speedup from 8 threads)
+    numThreads = 16:    [96.739] ms     (6.06x speedup from 16 threads)
+    numThreads = 32:    [84.951] ms     (6.90x speedup from 32 threads)
+
+    模运算分割：
+    numThreads = 2:     [295.901] ms    (2.00x speedup from 2 threads)
+    numThreads = 3:     [196.242] ms    (3.02x speedup from 3 threads)
+    numThreads = 4:     [147.119] ms    (4.05x speedup from 4 threads)
+    numThreads = 5:     [126.715] ms    (4.65x speedup from 5 threads)
+    numThreads = 6:     [105.913] ms    (5.59x speedup from 6 threads)
+    numThreads = 7:     [91.051] ms     (6.49x speedup from 7 threads)
+    numThreads = 8:     [81.476] ms     (7.28x speedup from 8 threads)
+    numThreads = 16:    [84.275] ms     (7.01x speedup from 16 threads)
+
+    原因分析：
+    使用模运算分割可以减少存储器访问次数，可以理解为一段时间内各线程需要的数据块为同一数据块，
+    而简单按行分割则可能需要在线程切换的同时，因为所需数据块距离较远，cache或内存未命中而切换访问的数据块，
+    至于16线程表现平平乃至更差，是因为机器最高只能支持八线程，导致大量时间浪费在线程切换上
+
+*/
+
+
 int main(int argc, char** argv) {
 
     const unsigned int width = 1600;
     const unsigned int height = 1200;
     const int maxIterations = 256;
-    int numThreads = 2;
+    int numThreads = 8;
 
     float x0 = -2;
     float x1 = 1;
