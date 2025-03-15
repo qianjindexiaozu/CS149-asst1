@@ -186,6 +186,9 @@ void absVector(float* values, float* output, int N) {
 //  Note: Take a careful look at this loop indexing.  This example
 //  code is not guaranteed to work when (N % VECTOR_WIDTH) != 0.
 //  Why is that the case?
+//  查阅CS149intrin.cpp源代码可知，这里进行的是向量计算，每一条指令会一次性取 VECTOR_WIDTH 个参数并计算
+//  故若 N 不是 VECTOR_WIDTH 的倍数，则会导致指令在最后一次取数时越界
+
   for (int i=0; i<N; i+=VECTOR_WIDTH) {
 
     // All ones
@@ -240,6 +243,15 @@ void clampedExpSerial(float* values, int* exponents, float* output, int N) {
   }
 }
 
+
+/*
+  VECTOR_WIDTH: 2     Vector Utilization: 78.2%
+  VECTOR_WIDTH: 4     Vector Utilization: 73.8%
+  VECTOR_WIDTH: 8     Vector Utilization: 71.6%
+  VECTOR_WIDTH: 16    Vector Utilization: 70.6%
+*/
+
+
 void clampedExpVector(float* values, int* exponents, float* output, int N) {
 
   //
@@ -249,6 +261,66 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
+
+  __cs149_vec_float x;
+  __cs149_vec_int y;
+  __cs149_vec_int count;
+  __cs149_vec_float result;
+
+  __cs149_vec_float zero_f = _cs149_vset_float(0.f);
+  __cs149_vec_int zero_i = _cs149_vset_int(0);
+
+  __cs149_vec_float one_f = _cs149_vset_float(1.f);
+  __cs149_vec_int one_i = _cs149_vset_int(1);
+
+  __cs149_vec_float nine_f = _cs149_vset_float(9.999999f);
+
+  __cs149_mask maskAll, maskIsLoop, maskIsEqual, maskIsNotEqual, maskIsGreater;
+
+  for (int i = 0; i < N; i += VECTOR_WIDTH) {
+
+    // All ones
+    maskAll = _cs149_init_ones();
+
+    // All zeros
+    maskIsEqual = _cs149_init_ones(0);
+
+    // All zeros
+    maskIsGreater = _cs149_init_ones(0);
+
+
+    _cs149_vload_float(x, values + i, maskAll);             // float x = values[i];
+    
+    _cs149_vload_int(y, exponents + i, maskAll);             // int y = exponents[i];
+    
+    _cs149_veq_int(maskIsEqual, y, zero_i, maskAll);        // if (y == 0) {
+    
+    _cs149_vadd_float(result, zero_f, one_f, maskIsEqual);  //   output[i] = 1.f;
+    
+    maskIsNotEqual = _cs149_mask_not(maskIsEqual);            // } else {
+    
+    _cs149_vmove_float(result, x, maskIsNotEqual);            //   float result = x;
+    
+    _cs149_vsub_int(count, y, one_i, maskIsNotEqual);               //   int count = y - 1;
+    
+    do {
+
+      _cs149_vgt_int(maskIsLoop, count, zero_i, maskIsNotEqual);       //   while (count > 0) {
+    
+      _cs149_vmult_float(result, result, x, maskIsLoop);        //     result *= x;
+      
+      _cs149_vsub_int(count, count, one_i, maskIsLoop);          //     count--;
+
+    } while(_cs149_cntbits(maskIsLoop));
+    
+    _cs149_vgt_float(maskIsGreater, result, nine_f, maskIsNotEqual);          //   if (result > 9.999999f) {
+    
+    _cs149_vmove_float(result, nine_f, maskIsGreater);        //     result = 9.999999f;
+    
+    _cs149_vstore_float(output + i, result, maskAll);          //   output[i] = result;
+    
+                                                                // }
+  }
   
 }
 
